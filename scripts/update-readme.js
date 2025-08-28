@@ -7,7 +7,12 @@ const path = require('path');
 // Lista zadań do oznaczenia jako ukończone.
 // Wprowadź tutaj fragment dokładnego tekstu zadania z pliku README.md.
 const completedTasks = [
-    'Stworzenie interaktywnego przewodnika (onboarding tour) dla nowych użytkowników, prezentującego kluczowe moduły.'
+    'Dodanie funkcji "cofnij" dla kluczowych operacji, takich jak zastąpienie tekstu przez AI.',
+    '**Doświadczenie Nowego Użytkownika**',
+    'Wdrożenie bardziej zaawansowanej walidacji formularzy (np. blokowanie znaków nienumerycznych w polach procentowych).',
+    'Dodanie skrótów klawiszowych dla zaawansowanych użytkowników w edytorze Studio.',
+    '**Zaawansowane Funkcje i Jakość**',
+    'Zaimplementowanie rozwiązania do zarządzania stanem (np. Redux, Zustand) w celu lepszej obsługi w miarę rozrostu aplikacji.'
 ];
 
 const readmePath = path.join(__dirname, '..', 'README.md');

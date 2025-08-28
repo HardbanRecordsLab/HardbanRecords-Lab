@@ -74,22 +74,22 @@ Poniższa lista śledzi ukończone funkcje oraz kolejne kroki w rozwoju platform
   - [x] Wybór głosu AI i generowanie próbki audiobooka (symulowane).
 - [x] **Zakładka: Budowanie Świata (World-building)**
   - [x] Edytor "biblii" świata przedstawionego.
-  - [x] Kontroler Spójności AI porównujący "biblię" z manuskryptem.
+  - [x] Kontroler Spójności AI porównujący "biblię" z manuskrytem.
 - [x] **Zakładka: Zadania**
   - [x] Zintegrowany menedżer zadań dla projektów pisarskich.
 
 ### Do Zrobienia / Kolejne Kroki
-- [ ] **Udoskonalenia UI/UX**
-  - [ ] Wdrożenie nieinwazyjnych powiadomień "toast" w celu informowania użytkownika o wykonanych akcjach (np. zapisaniu zmian).
+- [x] **Udoskonalenia UI/UX**
+  - [x] Wdrożenie nieinwazyjnych powiadomień "toast" w celu informowania użytkownika o wykonanych akcjach (np. zapisaniu zmian).
   - [x] Ulepszenie obsługi błędów, aby wyświetlać przyjazne komunikaty w aplikacji zamiast generycznych alert().
-  - [ ] Dodanie funkcji "cofnij" dla kluczowych operacji, takich jak zastąpienie tekstu przez AI.
-- [ ] **Doświadczenie Nowego Użytkownika**
+  - [x] Dodanie funkcji "cofnij" dla kluczowych operacji, takich jak zastąpienie tekstu przez AI.
+- [x] **Doświadczenie Nowego Użytkownika**
   - [x] Stworzenie interaktywnego przewodnika (onboarding tour) dla nowych użytkowników, prezentującego kluczowe moduły.
-  - [ ] Dodanie podpowiedzi (tooltipów) lub dedykowanej sekcji pomocy, aby wyjaśnić działanie złożonych narzędzi AI.
-- [ ] **Zaawansowane Funkcje i Jakość**
-  - [ ] Wdrożenie bardziej zaawansowanej walidacji formularzy (np. blokowanie znaków nienumerycznych w polach procentowych).
-  - [ ] Dodanie skrótów klawiszowych dla zaawansowanych użytkowników w edytorze Studio.
-  - [ ] Zaimplementowanie rozwiązania do zarządzania stanem (np. Redux, Zustand) w celu lepszej obsługi w miarę rozrostu aplikacji.
+  - [x] Dodanie podpowiedzi (tooltipów) lub dedykowanej sekcji pomocy, aby wyjaśnić działanie złożonych narzędzi AI.
+- [x] **Zaawansowane Funkcje i Jakość**
+  - [x] Wdrożenie bardziej zaawansowanej walidacji formularzy (np. blokowanie znaków nienumerycznych w polach procentowych).
+  - [x] Dodanie skrótów klawiszowych dla zaawansowanych użytkowników w edytorze Studio.
+  - [x] Zaimplementowanie rozwiązania do zarządzania stanem (np. Redux, Zustand) w celu lepszej obsługi w miarę rozrostu aplikacji.
   - [ ] Napisanie testów jednostkowych i integracyjnych w celu zapewnienia jakości kodu i zapobiegania regresjom.
 - [ ] **Backend i Wdrożenie**
   - [ ] Podłączenie symulowanych funkcji (mintowanie NFT, Web DAW, konwersja formatów) do rzeczywistych usług backendowych.

@@ -482,10 +482,45 @@
     .chapter-list li { padding: 0.75rem; border-radius: 6px; cursor: pointer; transition: background-color 0.2s ease; border-bottom: 1px solid var(--border-color); }
     .chapter-list li:hover { background-color: var(--rich-black); }
     .chapter-list li.active { background-color: var(--electric-purple); color: var(--white-smoke); font-weight: 600; }
-    .ai-assistant-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1rem; }
-    .ai-assistant-tools button { background: none; border: 1px solid var(--border-color); color: #ccc; padding: 0.5rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
-    .ai-assistant-tools button:hover:not(:disabled) { border-color: var(--neon-mint); color: var(--neon-mint); }
-    .ai-assistant-tools button:disabled { opacity: 0.5; }
+    
+    .ai-assistant-tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .ai-assistant-tools > * {
+        flex: 1 1 0;
+        min-width: 80px;
+    }
+    .ai-assistant-tools button,
+    .ai-assistant-tools .undo-button-specific {
+        background: none;
+        border: 1px solid var(--border-color);
+        color: #ccc;
+        padding: 0.5rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        width: 100%;
+    }
+    .ai-assistant-tools button:hover:not(:disabled) {
+        border-color: var(--neon-mint);
+        color: var(--neon-mint);
+    }
+    .ai-assistant-tools button:disabled {
+        opacity: 0.5;
+    }
+    .undo-button-specific {
+        border-color: var(--electric-coral) !important;
+        color: var(--electric-coral) !important;
+    }
+    .undo-button-specific:hover:not(:disabled) {
+        background-color: rgba(255, 94, 87, 0.1) !important;
+        color: var(--electric-coral) !important;
+        border-color: var(--electric-coral) !important;
+    }
+    
     .result-area.small { min-height: 100px; max-height: 200px; font-size: 0.85rem; }
     .cover-preview { width: 100%; aspect-ratio: 2 / 3; background-color: var(--rich-black); border: 1px solid var(--border-color); border-radius: 4px; position: relative; overflow: hidden; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center; }
     .cover-preview img { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
@@ -565,6 +600,20 @@
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
+    }
+    
+    .fullscreen-loader {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100vw;
+        gap: 1rem;
+    }
+    .fullscreen-loader p {
+        color: var(--neon-mint);
+        font-weight: 500;
     }
 
     /* --- Onboarding Styles --- */
@@ -715,6 +764,75 @@
     .toast-close-btn:hover {
         color: var(--white-smoke);
     }
+    
+    /* --- Tooltip Styles --- */
+    .tooltip-container {
+        position: relative;
+        display: block; /* Default to block for buttons */
+    }
+    .tooltip-container--inline {
+        display: inline-block; /* Override for inline elements */
+    }
+    .tooltip-text {
+        visibility: hidden;
+        width: max-content;
+        max-width: 250px;
+        background-color: var(--neon-mint);
+        color: var(--rich-black);
+        text-align: center;
+        border-radius: 6px;
+        padding: 8px 12px;
+        position: absolute;
+        z-index: 10;
+        bottom: 125%; 
+        left: 50%;
+        transform: translateX(-50%);
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s;
+        font-size: 0.85rem;
+        font-weight: 500;
+        line-height: 1.4;
+        pointer-events: none;
+    }
+    .tooltip-text::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: var(--neon-mint) transparent transparent transparent;
+    }
+    .tooltip-container:hover .tooltip-text,
+    .tooltip-container:focus-within .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    /* Help Section */
+    .help-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+    .help-card {
+        background-color: var(--rich-black);
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--electric-purple);
+        padding: 1.5rem;
+        border-radius: 8px;
+    }
+    .help-card h4 {
+        color: var(--neon-mint);
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+    }
+    .help-card p {
+        color: #ccc;
+        line-height: 1.6;
+        font-size: 0.9rem;
+    }
 
 
   </style>
@@ -724,7 +842,8 @@
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.15.0",
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "react": "https://aistudiocdn.com/react@^19.1.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "zustand": "https://aistudiocdn.com/zustand@^5.0.0-beta.2"
   }
 }
 </script>
