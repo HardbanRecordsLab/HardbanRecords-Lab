@@ -681,7 +681,7 @@ const MusicPublishingView: FC = () => {
     const [forecastResult, setForecastResult] = useState('');
 
     // Splits Tab State
-    const [selectedReleaseId, setSelectedReleaseId] = useState<string>(releases.length > 0 ? releases[0].id.toString() : '');
+    const [selectedReleaseId, setSelectedReleaseId] = useState<string>('');
     const [collaborators, setCollaborators] = useState<ReleaseCollaborator[]>([]);
     const [splitAgreement, setSplitAgreement] = useState('');
     const selectedRelease = useMemo(() => releases.find(r => r.id === parseInt(selectedReleaseId, 10)), [releases, selectedReleaseId]);
@@ -1113,10 +1113,10 @@ const MusicPublishingView: FC = () => {
                         tooltipText="AI analyzes your track against the selected brief to determine its suitability for sync licensing opportunities."
                     >
                         <p>
-                            Select a brief, and AI will check compatibility with {' '}
-                            {releases.length > 0 
+                            Select a brief, and AI will check compatibility with{' '}
+                            {releases.length > 0
                                 ? `your latest track ('${releases[0].title}').`
-                                : 'one of your tracks.'
+                                : 'one of your tracks (when available).'
                             }
                         </p>
                         <div className="result-area">
