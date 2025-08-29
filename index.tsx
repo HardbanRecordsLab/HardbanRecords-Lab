@@ -1,4 +1,3 @@
-
 import React, { useState, FC, ReactNode, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -10,30 +9,6 @@ if (!API_KEY) {
   throw new Error("API_KEY environment variable not set.");
 }
 const ai = new GoogleGenAI({ apiKey: API_KEY });
-
-// --- Backend API Configuration ---
-const API_BASE_URL = 'http://localhost:3001/api';
-
-// This function will eventually handle saving data back to the backend.
-// For now, we are only focusing on fetching data.
-const api = {
-    async fetchData() {
-        const response = await fetch(`${API_BASE_URL}/data`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch data from the server.');
-        }
-        return response.json();
-    },
-    // We will implement save functionality in the next steps.
-    // For now, we'll keep a placeholder.
-    async saveData(fullState: { music: AppState['music']; publishing: AppState['publishing']; onboardingComplete: boolean }) {
-        // Simulate a successful save without actually calling the backend yet.
-        await new Promise(res => setTimeout(res, 250));
-        console.log("Simulating save:", fullState);
-        return true;
-    }
-};
-
 
 // --- Helper & Type Definitions ---
 type LoadingState = {
@@ -167,6 +142,7 @@ interface AppState {
 interface AppActions {
     initializeApp: () => Promise<void>;
     _saveState: () => Promise<void>;
+    forceSave: () => Promise<void>;
     // View
     setView: (view: View) => void;
     // Loading
@@ -192,6 +168,31 @@ interface AppActions {
 }
 
 type AppStore = AppState & AppActions;
+
+
+// --- Backend API Configuration ---
+const API_BASE_URL = 'http://localhost:3001/api';
+
+const api = {
+    async fetchData() {
+        console.log("Fetching data from backend API...");
+        const response = await fetch(`${API_BASE_URL}/data`);
+        if (!response.ok) {
+            const errorBody = await response.text();
+            console.error("Failed to fetch data from backend:", response.status, errorBody);
+            throw new Error(`Failed to fetch: ${response.statusText}`);
+        }
+        return response.json();
+    },
+    async saveData(fullState: { music: AppState['music']; publishing: AppState['publishing']; onboardingComplete: boolean }) {
+        console.warn("Save functionality is not fully implemented on the backend yet. Simulating save.", fullState);
+        // The backend README indicates that granular save endpoints are planned but not yet implemented.
+        // This function simulates a successful save without making a network request.
+        await new Promise(res => setTimeout(res, 250));
+        return true;
+    }
+};
+
 
 const useAppStore = create<AppStore>((set, get) => ({
     // Initial State
@@ -222,7 +223,6 @@ const useAppStore = create<AppStore>((set, get) => ({
     initializeApp: async () => {
         set({ isInitialized: false });
         try {
-            // *** KEY CHANGE: Fetching from the backend API instead of mockApi ***
             const data = await api.fetchData();
             set({
                 music: data.music,
@@ -232,8 +232,9 @@ const useAppStore = create<AppStore>((set, get) => ({
             });
         } catch (error) {
             console.error("Failed to initialize app state from server:", error);
-            get().addToast("Could not load data from the server. Please check your connection and refresh.", "error");
-            set({ isInitialized: true }); // Still finish initializing to not block UI
+            get().addToast("Could not load data from the server. Please ensure the backend is running.", "error");
+            // Initialize with empty state from the store definition, UI will not be blocked.
+            set({ isInitialized: true });
         }
     },
 
@@ -241,6 +242,10 @@ const useAppStore = create<AppStore>((set, get) => ({
     _saveState: async () => {
         const { music, publishing, onboarding } = get();
         await api.saveData({ music, publishing, onboardingComplete: onboarding.onboardingComplete });
+    },
+
+    forceSave: async () => {
+        await get()._saveState();
     },
 
     setView: (view) => set({ view }),
@@ -418,12 +423,11 @@ const AIToolCard: FC<AIToolCardProps> = ({ title, children, onGenerate, isLoadin
   );
 };
 
-const ModuleView: FC<{ title: string; children: ReactNode }> = ({ title, children }) => {
-    const setView = useAppStore(state => state.setView);
+const ModuleView: FC<{ title: string; children: ReactNode, onBack: () => void }> = ({ title, children, onBack }) => {
     return (
     <div className="module-view">
         <div className="module-header">
-            <button onClick={() => setView('DASHBOARD')} className="back-button" aria-label="Back to Dashboard">
+            <button onClick={onBack} className="back-button" aria-label="Back to Dashboard">
                 &larr; Back to Dashboard
             </button>
             <h1>{title}</h1>
@@ -536,6 +540,36 @@ const Modal: FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
                 </div>
                 <div className="modal-actions" style={{ justifyContent: 'center' }}>
                     <button type="button" className="card-button" onClick={onClose} style={{ minWidth: '120px' }}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Generic Confirmation Modal Component ---
+interface ConfirmationModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    title: string;
+    onSave: () => void;
+    onDiscard: () => void;
+    children: ReactNode;
+}
+
+const ConfirmationModal: FC<ConfirmationModalProps> = ({ isOpen, onClose, title, children, onSave, onDiscard }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <h2>{title}</h2>
+                <div className="modal-body" style={{backgroundColor: 'transparent', border: 'none', padding: 0}}>
+                    {children}
+                </div>
+                <div className="modal-actions">
+                    <button type="button" className="button-secondary" onClick={onClose}>Cancel</button>
+                    <button type="button" className="button-secondary" style={{ background: 'none', border: '1px solid var(--electric-coral)', color: 'var(--electric-coral)' }} onClick={onDiscard}>Discard Changes</button>
+                    <button type="button" className="card-button" onClick={onSave}>Save & Continue</button>
                 </div>
             </div>
         </div>
@@ -657,11 +691,12 @@ const MusicPublishingView: FC = () => {
     type Tab = 'studio' | 'releases' | 'analytics' | 'splits' | 'sync' | 'career' | 'tasks' | 'help';
     const [activeTab, setActiveTab] = useState<Tab>('studio');
 
-    const { loading, setLoading, addToast, activeTabOverride } = useAppStore(state => ({
+    const { loading, setLoading, addToast, activeTabOverride, setView } = useAppStore(state => ({
         loading: state.loading,
         setLoading: state.setLoading,
         addToast: state.addToast,
-        activeTabOverride: state.onboarding.activeTabOverride
+        activeTabOverride: state.onboarding.activeTabOverride,
+        setView: state.setView
     }));
     const { releases, updateMusicSplits, addRelease } = useAppStore(state => ({
         releases: state.music.releases,
@@ -669,6 +704,9 @@ const MusicPublishingView: FC = () => {
         addRelease: state.addRelease
     }));
 
+    // Navigation confirmation state
+    const [isNavModalOpen, setNavModalOpen] = useState(false);
+    const [nextNavigationAction, setNextNavigationAction] = useState<(() => void) | null>(null);
 
     // Studio Tab State (ephemeral UI state)
     const [artist, setArtist] = useState('Synth Rider');
@@ -703,6 +741,25 @@ const MusicPublishingView: FC = () => {
         { id: 'brief2', 'title': 'Dark, Atmospheric Theme for a Sci-Fi Thriller', description: 'Need a tense, atmospheric electronic track. Minimalist, with a sense of dread and suspense. Think Blade Runner meets Stranger Things.'},
     ], []);
 
+    const isDirty = useMemo(() => {
+        if (!selectedRelease || activeTab !== 'splits') return false;
+        // Filter out any new, completely empty collaborator rows before comparing.
+        const cleanedCurrentSplits = collaborators.filter(c => c.name.trim() !== '' || c.share.trim() !== '');
+
+        // Deep compare the cleaned current state with the original state.
+        // Using JSON.stringify is simple and sufficient here because the UI prevents reordering.
+        return JSON.stringify(cleanedCurrentSplits) !== JSON.stringify(selectedRelease.splits);
+    }, [collaborators, selectedRelease, activeTab]);
+
+    const handleNavigate = useCallback((action: () => void) => {
+        if (isDirty) {
+            setNextNavigationAction(() => action);
+            setNavModalOpen(true);
+        } else {
+            action();
+        }
+    }, [isDirty]);
+
     useEffect(() => {
         if (activeTabOverride) {
             setActiveTab(activeTabOverride as Tab);
@@ -717,7 +774,7 @@ const MusicPublishingView: FC = () => {
 
     useEffect(() => {
         if (activeTab === 'splits' && selectedRelease) {
-            setCollaborators(selectedRelease.splits.length > 0 ? [...selectedRelease.splits] : [{ name: '', share: '' }]);
+            setCollaborators([...selectedRelease.splits]);
         }
     }, [selectedRelease, activeTab]);
 
@@ -816,7 +873,7 @@ const MusicPublishingView: FC = () => {
         }
     };
 
-    const handleAddCollaborator = () => setCollaborators([...collaborators, { name: '', share: '' }]);
+    const handleAddCollaborator = () => setCollaborators(prev => [...prev, { name: '', share: '' }]);
     const handleCollaboratorChange = (index: number, field: 'name' | 'share', value: string) => {
         const newCollaborators = [...collaborators];
         if (field === 'share') {
@@ -836,7 +893,11 @@ const MusicPublishingView: FC = () => {
     };
     const handleSaveSplits = () => {
         if(!selectedRelease) return;
-        updateMusicSplits(selectedRelease.id, collaborators);
+        // Filter out empty rows before saving
+        const cleanedCollaborators = collaborators.filter(c => c.name.trim() !== '' || c.share.trim() !== '');
+        updateMusicSplits(selectedRelease.id, cleanedCollaborators);
+        // Also update local state to reflect the cleaned version
+        setCollaborators(cleanedCollaborators);
         addToast(`Splits for "${selectedRelease.title}" have been updated.`, 'success');
     };
     const totalSplit = useMemo(() => collaborators.reduce((sum, collab) => sum + (parseFloat(collab.share) || 0), 0), [collaborators]);
@@ -929,8 +990,31 @@ const MusicPublishingView: FC = () => {
             setSplitAgreement(response.text);
         } catch (e) { console.error(e); addToast("Failed to generate split agreement text.", 'error'); } finally { setLoading('splitAgreement', false);}
     };
-    
 
+    // --- Navigation Modal Handlers ---
+    const handleCancelNavigation = () => {
+        setNavModalOpen(false);
+        setNextNavigationAction(null);
+    };
+
+    const handleDiscardAndNavigate = () => {
+        if (selectedRelease) {
+            setCollaborators([...selectedRelease.splits]);
+        }
+        if (nextNavigationAction) {
+            nextNavigationAction();
+        }
+        handleCancelNavigation();
+    };
+
+    const handleSaveAndNavigate = () => {
+        handleSaveSplits();
+        if (nextNavigationAction) {
+            nextNavigationAction();
+        }
+        handleCancelNavigation();
+    };
+    
     const renderContent = () => {
         switch (activeTab) {
             case 'studio':
@@ -1151,11 +1235,11 @@ const MusicPublishingView: FC = () => {
     }
 
     return (
-        <ModuleView title="Music Publishing AI">
+        <ModuleView title="Music Publishing AI" onBack={() => handleNavigate(() => setView('DASHBOARD'))}>
              <div className="tabs-container">
                 <nav className="tab-nav">
                     {(['studio', 'releases', 'analytics', 'splits', 'sync', 'career', 'tasks', 'help'] as Tab[]).map(tab => (
-                        <button key={tab} className={`tab-button ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
+                        <button key={tab} className={`tab-button ${activeTab === tab ? 'active' : ''}`} onClick={() => handleNavigate(() => setActiveTab(tab))}>
                             {tab.charAt(0).toUpperCase() + tab.slice(1)}
                         </button>
                     ))}
@@ -1164,6 +1248,15 @@ const MusicPublishingView: FC = () => {
                     {renderContent()}
                 </div>
             </div>
+            <ConfirmationModal
+                isOpen={isNavModalOpen}
+                onClose={handleCancelNavigation}
+                title="Unsaved Changes"
+                onSave={handleSaveAndNavigate}
+                onDiscard={handleDiscardAndNavigate}
+            >
+                <p>You have unsaved changes. Would you like to save them before navigating away?</p>
+            </ConfirmationModal>
         </ModuleView>
     );
 };
@@ -1194,11 +1287,13 @@ const DigitalPublishingAIView: FC = () => {
     type Tab = 'studio' | 'distribution' | 'analytics' | 'rights_splits' | 'marketing' | 'audiobook' | 'world_building' | 'tasks' | 'help';
     const [activeTab, setActiveTab] = useState<Tab>('studio');
     
-    const { loading, setLoading, addToast, activeTabOverride } = useAppStore(state => ({
+    const { loading, setLoading, addToast, activeTabOverride, setView, forceSave } = useAppStore(state => ({
         loading: state.loading,
         setLoading: state.setLoading,
         addToast: state.addToast,
-        activeTabOverride: state.onboarding.activeTabOverride
+        activeTabOverride: state.onboarding.activeTabOverride,
+        setView: state.setView,
+        forceSave: state.forceSave,
     }));
     const { books, addBook, updateBook, updateChapterContent } = useAppStore(state => ({
         books: state.publishing.books,
@@ -1209,6 +1304,11 @@ const DigitalPublishingAIView: FC = () => {
 
     const [selectedBookId, setSelectedBookId] = useState<string>('');
     const selectedBook = useMemo(() => books.find(b => b.id === parseInt(selectedBookId, 10)), [books, selectedBookId]);
+
+    // Navigation confirmation state
+    const [isNavModalOpen, setNavModalOpen] = useState(false);
+    const [nextNavigationAction, setNextNavigationAction] = useState<(() => void) | null>(null);
+    const [isManuscriptDirty, setManuscriptDirty] = useState(false);
 
     // Create Book Modal State
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -1241,11 +1341,36 @@ const DigitalPublishingAIView: FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const manuscriptEditorRef = useRef<HTMLTextAreaElement>(null);
 
+    const areSplitsDirty = useMemo(() => {
+        if (!selectedBook || activeTab !== 'rights_splits') return false;
+        // Filter out any new, completely empty collaborator rows before comparing.
+        const cleanedCurrentSplits = collaborators.filter(c => c.name.trim() !== '' || c.share.trim() !== '');
+
+        // Deep compare the cleaned current state with the original state.
+        return JSON.stringify(cleanedCurrentSplits) !== JSON.stringify(selectedBook.splits);
+    }, [collaborators, selectedBook, activeTab]);
+
+    const isDirty = useMemo(() => {
+        if (activeTab === 'studio') return isManuscriptDirty;
+        if (activeTab === 'rights_splits') return areSplitsDirty;
+        return false;
+    }, [activeTab, isManuscriptDirty, areSplitsDirty]);
+
+    const handleNavigate = useCallback((action: () => void) => {
+        if (isDirty) {
+            setNextNavigationAction(() => action);
+            setNavModalOpen(true);
+        } else {
+            action();
+        }
+    }, [isDirty]);
+
     // --- AI Writing Assistant Handlers ---
     const applyAiChange = useCallback((newText: string) => {
         if (selectedBook) {
             setLastManuscriptState(manuscriptText);
             setManuscriptText(newText);
+            setManuscriptDirty(true);
             updateChapterContent(selectedBook.id, activeChapterIndex, newText);
         }
     }, [selectedBook, manuscriptText, activeChapterIndex, updateChapterContent]);
@@ -1311,17 +1436,23 @@ const DigitalPublishingAIView: FC = () => {
         }
     }, [books, selectedBookId]);
     
+    // Effect for handling manuscript text changes
     useEffect(() => {
         setLastManuscriptState(null); // Reset undo state on navigation
         if (selectedBook) {
             setManuscriptText(selectedBook.chapters[activeChapterIndex]?.content || '');
-            if(activeTab === 'rights_splits') {
-                setCollaborators(selectedBook.splits.length > 0 ? [...selectedBook.splits] : [{ name: '', share: '' }]);
-            }
+            setManuscriptDirty(false);
         } else {
             setManuscriptText(''); // Clear manuscript if no book is selected
         }
-    }, [selectedBook, activeChapterIndex, activeTab]);
+    }, [selectedBook, activeChapterIndex]);
+
+    // Effect for handling collaborator state changes
+    useEffect(() => {
+        if (selectedBook && activeTab === 'rights_splits') {
+            setCollaborators([...selectedBook.splits]);
+        }
+    }, [selectedBook, activeTab]);
 
     useEffect(() => {
         const editor = manuscriptEditorRef.current;
@@ -1362,13 +1493,14 @@ const DigitalPublishingAIView: FC = () => {
     const handleManuscriptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newContent = e.target.value;
         setManuscriptText(newContent);
+        setManuscriptDirty(true);
         if (selectedBook) {
             updateChapterContent(selectedBook.id, activeChapterIndex, newContent);
         }
     };
     
     const handleChapterChange = (index: number) => {
-        setActiveChapterIndex(index);
+       handleNavigate(() => setActiveChapterIndex(index));
     };
     
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1382,6 +1514,7 @@ const DigitalPublishingAIView: FC = () => {
                 setActiveChapterIndex(0);
                 setManuscriptText(text);
                 setLastManuscriptState(null); // Reset undo on new upload
+                setManuscriptDirty(true);
                 addToast("Manuscript uploaded successfully.", "success");
             };
             reader.readAsText(file);
@@ -1398,17 +1531,21 @@ const DigitalPublishingAIView: FC = () => {
     
     const handleCreateNewChapter = async () => {
         if (!selectedBook) return;
-        const newChapter: BookChapter = { title: `Chapter ${selectedBook.chapters.length + 1}`, content: "" };
-        const updatedChapters = [...selectedBook.chapters, newChapter];
-        await updateBook(selectedBook.id, { chapters: updatedChapters });
-        setActiveChapterIndex(updatedChapters.length - 1);
-        addToast("New chapter added.", "success");
+        const action = async () => {
+            const newChapter: BookChapter = { title: `Chapter ${selectedBook.chapters.length + 1}`, content: "" };
+            const updatedChapters = [...selectedBook.chapters, newChapter];
+            await updateBook(selectedBook.id, { chapters: updatedChapters });
+            setActiveChapterIndex(updatedChapters.length - 1);
+            addToast("New chapter added.", "success");
+        };
+        handleNavigate(action);
     };
 
     const handleUndo = () => {
         if (selectedBook && lastManuscriptState !== null) {
             setManuscriptText(lastManuscriptState);
             updateChapterContent(selectedBook.id, activeChapterIndex, lastManuscriptState);
+            setManuscriptDirty(true);
             setLastManuscriptState(null); // Clear undo state after using it
             addToast("AI change has been reverted.", "success");
         }
@@ -1489,7 +1626,7 @@ const DigitalPublishingAIView: FC = () => {
         await updateBook(selectedBook.id, { rights: updatedRights });
     };
     
-    const handleAddCollaborator = () => setCollaborators([...collaborators, { name: '', share: '' }]);
+    const handleAddCollaborator = () => setCollaborators(prev => [...prev, { name: '', share: '' }]);
     const handleCollaboratorChange = (index: number, field: 'name' | 'share', value: string) => {
         const newCollaborators = [...collaborators];
         if (field === 'share') {
@@ -1509,7 +1646,9 @@ const DigitalPublishingAIView: FC = () => {
     };
     const handleSaveSplits = () => {
         if(!selectedBook) return;
-        updateBook(selectedBook.id, { splits: collaborators });
+        const cleanedCollaborators = collaborators.filter(c => c.name.trim() !== '' || c.share.trim() !== '');
+        updateBook(selectedBook.id, { splits: cleanedCollaborators });
+        setCollaborators(cleanedCollaborators);
         addToast(`Splits for "${selectedBook.title}" have been updated.`, 'success');
     };
     const totalSplit = useMemo(() => collaborators.reduce((sum, collab) => sum + (parseFloat(collab.share) || 0), 0), [collaborators]);
@@ -1572,9 +1711,44 @@ const DigitalPublishingAIView: FC = () => {
         } catch (e) { console.error(e); addToast("Failed to check world consistency.", 'error'); } finally { setLoading('worldConsistency', false); }
     };
 
+    // --- Navigation Modal Handlers ---
+    const handleCancelNavigation = () => {
+        setNavModalOpen(false);
+        setNextNavigationAction(null);
+    };
+
+    const handleDiscardAndNavigate = () => {
+        if (activeTab === 'studio' && selectedBook) {
+            setManuscriptText(selectedBook.chapters[activeChapterIndex]?.content || '');
+            setManuscriptDirty(false);
+        }
+        if (activeTab === 'rights_splits' && selectedBook) {
+            setCollaborators([...selectedBook.splits]);
+        }
+
+        if (nextNavigationAction) {
+            nextNavigationAction();
+        }
+        handleCancelNavigation();
+    };
+
+    const handleSaveAndNavigate = async () => {
+        if (activeTab === 'studio' && selectedBook) {
+            await forceSave();
+            setManuscriptDirty(false);
+        }
+        if (activeTab === 'rights_splits') {
+            handleSaveSplits();
+        }
+        
+        if (nextNavigationAction) {
+            nextNavigationAction();
+        }
+        handleCancelNavigation();
+    };
 
     const renderContent = () => {
-        if (books.length === 0 && activeTab !== 'tasks') {
+        if (books.length === 0 && activeTab !== 'tasks' && activeTab !== 'help') {
              return (
                 <div className="empty-state-card large-span">
                     <h3>Your Bookshelf is Empty</h3>
@@ -1594,7 +1768,7 @@ const DigitalPublishingAIView: FC = () => {
                             <>
                                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
                                     <h3>{selectedBook.title} - Editor</h3>
-                                     <select className="styled-select" value={selectedBookId} onChange={e => setSelectedBookId(e.target.value)} style={{maxWidth: '200px'}}>
+                                     <select className="styled-select" value={selectedBookId} onChange={e => handleNavigate(() => setSelectedBookId(e.target.value))} style={{maxWidth: '200px'}}>
                                         {books.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
                                     </select>
                                 </div>
@@ -1676,7 +1850,7 @@ const DigitalPublishingAIView: FC = () => {
                          {!selectedBook && books.length > 0 && (
                             <div className="sidebar-section">
                                 <p>Select a book from the dropdown to begin.</p>
-                                <select className="styled-select" value={selectedBookId} onChange={e => setSelectedBookId(e.target.value)}>
+                                <select className="styled-select" value={selectedBookId} onChange={e => handleNavigate(() => setSelectedBookId(e.target.value))}>
                                     <option value="" disabled>Select a book</option>
                                     {books.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
                                 </select>
@@ -1732,7 +1906,7 @@ const DigitalPublishingAIView: FC = () => {
                     <h3>Manage Rights & Splits</h3>
                     <div className="form-section">
                         <label htmlFor="book-select-rights">Select Book</label>
-                        <select id="book-select-rights" className="styled-select" value={selectedBookId} onChange={e => setSelectedBookId(e.target.value)}>
+                        <select id="book-select-rights" className="styled-select" value={selectedBookId} onChange={e => handleNavigate(() => setSelectedBookId(e.target.value))}>
                            {books.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
                         </select>
                     </div>
@@ -1828,11 +2002,11 @@ const DigitalPublishingAIView: FC = () => {
     }
     
     return (
-        <ModuleView title="Digital Publishing AI">
+        <ModuleView title="Digital Publishing AI" onBack={() => handleNavigate(() => setView('DASHBOARD'))}>
             <div className="tabs-container">
                 <nav className="tab-nav">
                     {(['studio', 'distribution', 'analytics', 'rights_splits', 'marketing', 'world_building', 'tasks', 'help'] as Tab[]).map(tab => (
-                        <button key={tab} className={`tab-button ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
+                        <button key={tab} className={`tab-button ${activeTab === tab ? 'active' : ''}`} onClick={() => handleNavigate(() => setActiveTab(tab))}>
                            {formatTabName(tab)}
                         </button>
                     ))}
@@ -1872,6 +2046,16 @@ const DigitalPublishingAIView: FC = () => {
             <Modal isOpen={isAnalysisModalOpen} onClose={() => setAnalysisModalOpen(false)} title="AI Plot Analysis">
                 <pre>{analysisResult}</pre>
             </Modal>
+
+            <ConfirmationModal
+                isOpen={isNavModalOpen}
+                onClose={handleCancelNavigation}
+                title="Unsaved Changes"
+                onSave={handleSaveAndNavigate}
+                onDiscard={handleDiscardAndNavigate}
+            >
+                <p>You have unsaved changes. Would you like to save them before navigating away?</p>
+            </ConfirmationModal>
             
         </ModuleView>
     );
@@ -1914,14 +2098,11 @@ const App = () => {
         return <FullScreenLoader />;
     }
 
-    const renderView = () => {
-        switch (view) {
-            case 'MUSIC':
-                return <MusicPublishingView />;
-            case 'PUBLISHING':
-                return <DigitalPublishingAIView />;
-            default:
-                return (
+    return (
+        <>
+            <Header />
+            <main className="container">
+                {view === 'DASHBOARD' && (
                     <>
                         <div className="main-heading">
                             <h1>Your Creative Universe</h1>
@@ -1942,15 +2123,9 @@ const App = () => {
                             />
                         </div>
                     </>
-                );
-        }
-    };
-
-    return (
-        <>
-            <Header />
-            <main className="container">
-                {renderView()}
+                )}
+                {view === 'MUSIC' && <MusicPublishingView />}
+                {view === 'PUBLISHING' && <DigitalPublishingAIView />}
             </main>
             {currentTourStep && (
                 <OnboardingTour
